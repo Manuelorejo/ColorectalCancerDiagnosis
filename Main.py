@@ -204,47 +204,7 @@ if st.button("Predict Risk"):
             - Close monitoring required
             """)
     
-    # Feature importance section
-    st.markdown("---")
-    st.subheader("Risk Factor Analysis")
-    
-    # Get feature importance values from the model
-    feature_importance = pd.DataFrame({
-        'Feature': feature_names,
-        'Importance': best_model.feature_importances_
-    }).sort_values('Importance', ascending=False)
-    
-    # Create columns for feature importance
-    fi_col1, fi_col2 = st.columns([2, 1])
-    
-    with fi_col1:
-        # Create feature importance plot
-        fig, ax = plt.subplots(figsize=(10, 6))
-        sns.barplot(x='Importance', y='Feature', data=feature_importance[:10], ax=ax)
-        plt.title('Feature Importance in Random Forest Model')
-        plt.tight_layout()
-        st.pyplot(fig)
-    
-    with fi_col2:
-        st.markdown("### Key Risk Factors")
-        for idx, row in feature_importance.head(5).iterrows():
-            feature_name = row['Feature'].replace('_', ' ')
-            st.markdown(f"- **{feature_name}**: {row['Importance']:.4f}")
-        
-        st.markdown("""
-        ### What This Means
-        The factors listed have the greatest influence on the prediction. 
-        High levels of pathogenic bacteria (like F. nucleatum) increase risk, 
-        while high levels of protective bacteria (like F. prausnitzii) decrease risk.
-        
-        Random Forest models are particularly good at capturing complex relationships
-        between gut microbiome composition and colorectal cancer risk.
-        """)
-
-    # Add patient data table for reference
-    st.markdown("---")
-    st.subheader("Patient Microbiome Profile")
-    st.dataframe(patient_df)
+   
 
 # Add information footer
 st.markdown("---")
