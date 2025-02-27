@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.preprocessing import StandardScaler
-import xgboost as xgb
+from sklearn.ensemble import RandomForestClassifier
 
 # Set page config
 st.set_page_config(
@@ -35,15 +35,13 @@ def load_model():
     scaler = StandardScaler()
     X_train_scaled = scaler.fit_transform(X_train)
     
-    # Train XGBoost model with predefined best parameters
-    best_model = xgb.XGBClassifier(
+    # Train Random Forest model with predefined best parameters
+    best_model = RandomForestClassifier(
         n_estimators=200,
-        max_depth=4,
-        learning_rate=0.05,
-        subsample=0.9,
-        colsample_bytree=0.9,
-        random_state=42,
-        eval_metric='logloss'
+        max_depth=10,
+        min_samples_split=5,
+        min_samples_leaf=2,
+        random_state=42
     )
     best_model.fit(X_train_scaled, y_train)
     
@@ -223,7 +221,7 @@ if st.button("Predict Risk"):
         # Create feature importance plot
         fig, ax = plt.subplots(figsize=(10, 6))
         sns.barplot(x='Importance', y='Feature', data=feature_importance[:10], ax=ax)
-        plt.title('Feature Importance in Prediction Model')
+        plt.title('Feature Importance in Random Forest Model')
         plt.tight_layout()
         st.pyplot(fig)
     
@@ -238,6 +236,9 @@ if st.button("Predict Risk"):
         The factors listed have the greatest influence on the prediction. 
         High levels of pathogenic bacteria (like F. nucleatum) increase risk, 
         while high levels of protective bacteria (like F. prausnitzii) decrease risk.
+        
+        Random Forest models are particularly good at capturing complex relationships
+        between gut microbiome composition and colorectal cancer risk.
         """)
 
     # Add patient data table for reference
@@ -250,4 +251,6 @@ st.markdown("---")
 st.caption("""
 **Disclaimer**: This tool is for educational purposes only and should not replace professional medical advice. 
 Always consult with healthcare providers for diagnosis and treatment decisions.
+
+Model: Random Forest classifier trained on gut microbiome data.
 """)
