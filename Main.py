@@ -3,213 +3,165 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.preprocessing import StandardScaler
-from sklearn.ensemble import RandomForestClassifier
+import joblib
 
 # Set page config
 st.set_page_config(
-    page_title="Colorectal Cancer Risk Prediction",
-    page_icon="🔬",
+    page_title="Gut Microbiome Analysis",
+    page_icon="🦠",
     layout="wide"
 )
 
-# Load the trained model and scaler
-@st.cache_resource
-def load_model():
-    # Load the dataset
-    df = pd.read_csv('Colorectal_Cancer.csv')
-    
-    # Convert gender to numeric for modeling
-    df['gender_numeric'] = df['gender'].map({'M': 1, 'F': 0})
-    
-    # Prepare features and target
-    X = df.drop(['patient_id', 'gender', 'colorectal_cancer'], axis=1)
-    y = df['colorectal_cancer']
-    
-    # Split the data
-    from sklearn.model_selection import train_test_split
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
-    
-    # Scale numerical features
-    scaler = StandardScaler()
-    X_train_scaled = scaler.fit_transform(X_train)
-    
-    # Train Random Forest model with predefined best parameters
-    best_model = RandomForestClassifier(
-        n_estimators=200,
-        max_depth=10,
-        min_samples_split=5,
-        min_samples_leaf=2,
-        random_state=42
-    )
-    best_model.fit(X_train_scaled, y_train)
-    
-    return best_model, scaler, list(X.columns)
-
-# Load model and scaler
-best_model, scaler, feature_names = load_model()
-
 # Title and introduction
-st.title("Colorectal Cancer Risk Prediction")
+st.title("Gut Microbiome Analysis")
 st.markdown("""
-This application predicts the risk of colorectal cancer based on gut microbiome profiles.
-Enter the patient information below to get a personalized risk assessment.
+This application analyzes gut microbiome profiles to predict study group classification.
+Enter the microbiome abundance values below to get a prediction.
 """)
 
-# Display information about microbiome markers
-with st.expander("About Gut Microbiome Markers"):
-    st.markdown("""
-    ### Key Microbiome Markers for Colorectal Cancer
-    
-    - **Fusobacterium nucleatum**: Enriched in CRC tissues, associated with disease progression
-    - **Bacteroides fragilis**: Produces toxins that damage colon epithelium
-    - **Escherichia coli (pks+)**: Produces genotoxins linked to CRC development
-    - **Faecalibacterium prausnitzii**: Protective bacteria, lower levels associated with increased risk
-    - **Other markers**: Include Peptostreptococcus anaerobius, Parvimonas micra, Gemella morbillorum
-    
-    The values range from 0 to 1, representing relative abundance in the microbiome.
-    """)
+# Define feature names
+feature_names = [
+    'd__Bacteria;p__Actinobacteriota;c__Coriobacteriia;o__Coriobacteriales;f__Coriobacteriaceae;g__Collinsella',
+    'd__Bacteria;p__Bacteroidota;c__Bacteroidia;o__Bacteroidales;f__Bacteroidaceae;g__Bacteroides',
+    'd__Bacteria;p__Bacteroidota;c__Bacteroidia;o__Bacteroidales;f__Bacteroidaceae;g__Phocaeicola',
+    'd__Bacteria;p__Bacteroidota;c__Bacteroidia;o__Bacteroidales;f__Bacteroidaceae;g__Prevotella',
+    'd__Bacteria;p__Bacteroidota;c__Bacteroidia;o__Bacteroidales;f__Marinifilaceae;g__Odoribacter',
+    'd__Bacteria;p__Bacteroidota;c__Bacteroidia;o__Bacteroidales;f__Muribaculaceae;g__Limisoma',
+    'd__Bacteria;p__Bacteroidota;c__Bacteroidia;o__Bacteroidales;f__Rikenellaceae;g__Alistipes',
+    'd__Bacteria;p__Bacteroidota;c__Bacteroidia;o__Bacteroidales;f__Tannerellaceae;g__Parabacteroides',
+    'd__Bacteria;p__Firmicutes;c__Bacilli;o__Lactobacillales;f__Streptococcaceae;g__Streptococcus',
+    'd__Bacteria;p__Firmicutes_A;c__Clostridia;o__Lachnospirales;f__Lachnospiraceae;g__',
+    'd__Bacteria;p__Firmicutes_A;c__Clostridia;o__Lachnospirales;f__Lachnospiraceae;g__Acetatifactor',
+    'd__Bacteria;p__Firmicutes_A;c__Clostridia;o__Lachnospirales;f__Lachnospiraceae;g__Agathobacter',
+    'd__Bacteria;p__Firmicutes_A;c__Clostridia;o__Lachnospirales;f__Lachnospiraceae;g__Anaerostipes',
+    'd__Bacteria;p__Firmicutes_A;c__Clostridia;o__Lachnospirales;f__Lachnospiraceae;g__Blautia_A',
+    'd__Bacteria;p__Firmicutes_A;c__Clostridia;o__Lachnospirales;f__Lachnospiraceae;g__Lachnospira',
+    'd__Bacteria;p__Firmicutes_A;c__Clostridia;o__Oscillospirales;f__Ruminococcaceae;g__Faecalibacterium',
+    'd__Bacteria;p__Firmicutes_A;c__Clostridia;o__Oscillospirales;f__Ruminococcaceae;g__Ruminiclostridium_E',
+    'd__Bacteria;p__Firmicutes_C;c__Negativicutes;o__Acidaminococcales;f__Acidaminococcaceae;g__Phascolarctobacterium',
+    'd__Bacteria;p__Proteobacteria;c__Gammaproteobacteria;o__Pseudomonadales;f__Pseudomonadaceae;g__Pseudomonas_E'
+]
 
-# Create two columns for input
-col1, col2 = st.columns(2)
+# Function to get simplified name for display
+def simple_name(feature):
+    parts = feature.split(';')
+    if parts:
+        genus = parts[-1].split('__')[-1]
+        if genus == '':
+            family = parts[-2].split('__')[-1]
+            return f"{family} (unknown genus)"
+        return genus
+    return feature
 
-# Patient demographic information
-with col1:
-    st.subheader("Patient Information")
-    age = st.slider("Age", min_value=18, max_value=95, value=60)
-    gender = st.radio("Gender", ["Male", "Female"])
-    gender_numeric = 1 if gender == "Male" else 0
+# Load the model at the start of the app
+try:
+    model = joblib.load('LogisticRegression.sav')
+    model_loaded = True
+except Exception as e:
+    st.error(f"Failed to load model: {e}")
+    model_loaded = False
 
-# Microbiome marker inputs
-with col2:
-    st.subheader("Microbiome Markers")
-    
-    # Create a default value dictionary based on average values
-    # Ensure these features match and maintain the same order as feature_names
-    microbiome_features = [f for f in feature_names if f not in ['age', 'gender_numeric']]
-    
-    default_values = {f: 0.3 for f in microbiome_features}
-    # Set a higher default for the protective bacteria
-    if 'Faecalibacterium_prausnitzii' in default_values:
-        default_values['Faecalibacterium_prausnitzii'] = 0.6
-    
-    # Create sliders for each microbiome marker
-    microbiome_values = {}
-    for feature in microbiome_features:
-        # Format the display name
-        display_name = feature.replace('_', ' ')
-        microbiome_values[feature] = st.slider(
+# Create inputs for microbiome values
+st.subheader("Enter Microbiome Values")
+
+# Create three columns for layout
+col1, col2, col3 = st.columns(3)
+columns = [col1, col2, col3]
+
+# Create sliders for each microbiome feature
+sample_data = {}
+for i, feature in enumerate(feature_names):
+    col_idx = i % 3
+    with columns[col_idx]:
+        display_name = simple_name(feature)
+        value = st.slider(
             display_name, 
             min_value=0.0, 
             max_value=1.0, 
-            value=default_values.get(feature, 0.3),
+            value=0.1,
             step=0.01
         )
+        sample_data[feature] = value
 
 # Predict button
-if st.button("Predict Risk"):
-    # Create ordered dictionary matching training features
-    patient_data = {}
-    for feature in feature_names:
-        if feature == 'age':
-            patient_data[feature] = age
-        elif feature == 'gender_numeric':
-            patient_data[feature] = gender_numeric
-        else:
-            patient_data[feature] = microbiome_values.get(feature, 0.0)
+# Update the prediction results section
+# Update the prediction results section
+if st.button("Predict Group") and model_loaded:
+    # Create DataFrame with input values
+    input_df = pd.DataFrame([sample_data])
     
-    # Create DataFrame from patient data with correct feature order
-    patient_df = pd.DataFrame([patient_data])
-    
-    # Ensure column order matches training data
-    patient_df = patient_df[feature_names]
-    
-    # Scale features
-    patient_scaled = scaler.transform(patient_df)
-    
-    # Predict probability
-    risk_probability = best_model.predict_proba(patient_scaled)[0, 1]
-    risk_percentage = risk_probability * 100
-    
-    # Determine risk category
-    if risk_percentage < 30:
-        risk_category = "Low"
-        color = "green"
-    elif risk_percentage < 70:
-        risk_category = "Moderate"
-        color = "orange"
-    else:
-        risk_category = "High"
-        color = "red"
-    
-    # Display result
-    st.markdown("---")
-    st.subheader("Risk Assessment")
-    
-    # Create columns for results display
-    res_col1, res_col2 = st.columns([1, 2])
-    
-    with res_col1:
-        # Display risk meter
-        fig, ax = plt.subplots(figsize=(4, 3))
+    # Make prediction
+    try:
+        prediction = model.predict(input_df)[0]
+        probabilities = model.predict_proba(input_df)[0]
         
-        # Create gauge chart
-        gauge_colors = ['green', 'yellow', 'orange', 'red']
-        plt.pie(
-            [1], 
-            colors=['lightgray'],
-            wedgeprops={'width': 0.4, 'edgecolor': 'white'},
-            startangle=90,
-            counterclock=False
-        )
-        plt.pie(
-            [risk_probability, 1-risk_probability], 
-            colors=[color, 'white'],
-            wedgeprops={'width': 0.4, 'edgecolor': 'white'},
-            startangle=90,
-            counterclock=False
-        )
-        plt.title(f"{risk_percentage:.1f}% Risk", fontsize=16)
-        plt.axis('equal')
-        st.pyplot(fig)
+        # Map numerical prediction to group names
+        group_map = {0: "Adenoma", 1: "Carcinoma", 2: "Control"}
+        predicted_group = group_map[prediction]
         
-        st.markdown(f"### {risk_category} Risk")
+        # Display results
+        st.markdown("---")
+        st.subheader("Prediction Results")
         
-    with res_col2:
-        st.markdown(f"""
-        Based on the provided microbiome profile, this patient has a 
-        **{risk_percentage:.1f}%** probability of colorectal cancer, 
-        which is classified as **{risk_category} Risk**.
-        """)
+        # Show prediction with explanation
+        st.markdown(f"## Predicted Group: {predicted_group}")
         
-        # Recommendations based on risk
-        st.subheader("Recommendations")
-        if risk_category == "Low":
+        # Get confidence score (probability of the predicted class)
+        confidence_score = probabilities[prediction] * 100
+        
+        # Display confidence score with a progress bar
+        st.markdown("### Confidence Score")
+        st.progress(confidence_score/100)
+        st.markdown(f"**{confidence_score:.1f}%** confidence in this prediction")
+        
+        # Add explanation based on prediction
+        st.markdown("### What this means:")
+        if predicted_group == "Control":
             st.markdown("""
-            - Routine colorectal cancer screening as per age-appropriate guidelines
-            - Maintain healthy lifestyle habits
-            - No immediate additional testing required
+            Your microbiome profile is similar to individuals without colorectal abnormalities. 
+            This suggests a lower risk for colorectal cancer based on the microbial markers analyzed.
             """)
-        elif risk_category == "Moderate":
+        elif predicted_group == "Adenoma":
             st.markdown("""
-            - Consider earlier screening colonoscopy
-            - Evaluate other risk factors
-            - Follow-up stool testing in 6-12 months
+            Your microbiome profile resembles that of patients with adenomas (precancerous polyps).
+            Adenomas are benign growths that may develop into cancer over time if not removed.
+            **Recommendation:** Discuss with your healthcare provider about appropriate screening procedures.
             """)
-        else:
+        elif predicted_group == "Carcinoma":
             st.markdown("""
-            - Immediate referral for colonoscopy
-            - Comprehensive cancer evaluation recommended
-            - Close monitoring required
+            Your microbiome profile shows similarities to patients with colorectal carcinoma.
+            This suggests potential presence of colorectal cancer based on microbial markers.
+            **Recommendation:** Consult with a healthcare provider promptly for further clinical evaluation.
             """)
-    
-   
+            
+        # Display warning about the tool
+        st.warning("Note: This is a screening tool only and not a diagnosis. Clinical evaluation by a healthcare professional is required for proper diagnosis.")
+        
+        # Create expandable section for detailed probability breakdown
+        with st.expander("View Detailed Probability Breakdown"):
+            for i, label in enumerate(model.classes_):
+                group_name = group_map[label]
+                probability = probabilities[i]
+                
+                col1, col2 = st.columns([7, 3])
+                
+                with col1:
+                    st.markdown(f"**{group_name}**")
+                    st.progress(probability)
+                
+                with col2:
+                    st.markdown(f"**{probability*100:.1f}%**")
+            
+    except Exception as e:
+        st.error(f"Error making prediction: {e}")
+        st.info("Please make sure your model is compatible with this application.")
+elif not model_loaded and st.button("Predict Group"):
+    st.error("Cannot make prediction because model failed to load.")
 
-# Add information footer
+# Add disclaimer
 st.markdown("---")
 st.caption("""
-**Disclaimer**: This tool is for educational purposes only and should not replace professional medical advice. 
-Always consult with healthcare providers for diagnosis and treatment decisions.
-
-Model: Random Forest classifier trained on gut microbiome data.
+**Important Disclaimer**: This tool analyzes gut microbiome patterns only and should not replace medical advice, diagnosis, or treatment. 
+The predictions are based on statistical patterns and require clinical validation. 
+Please consult with a healthcare professional for proper screening and diagnosis of colorectal conditions.
 """)
